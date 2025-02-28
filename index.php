@@ -1,24 +1,30 @@
-<?php
-// Get the relative path from the query parameter (e.g., "2504/default_primary.mpd")
-$get = $_GET['get'];
+export default async function handler(req, res) {
+  // Retrieve the relative path from the query string (e.g. "2504/default_primary.mpd")
+  const { get } = req.query;
+  if (!get) {
+    return res.status(400).send('Missing required parameter "get"');
+  }
 
-// Construct the full MPD URL using the provided base URL.
-$mpdUrl = 'https://linearjitp-playback.astro.com.my/dash-wv/linear/' . $get;
+  // Construct the target MPD URL
+  const targetUrl = `https://linearjitp-playback.astro.com.my/dash-wv/linear/${get}`;
 
-// Set up HTTP context with custom headers.
-$mpdheads = [
-  'http' => [
-      'header' => "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36\r\n",
-      'follow_location' => 1,
-      'timeout' => 5
-  ]
-];
+  try {
+    // Fetch the MPD file using a custom User-Agent header
+    const response = await fetch(targetUrl, {
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+      }
+    });
 
-$context = stream_context_create($mpdheads);
+    if (!response.ok) {
+      return res.status(response.status).send("Error fetching MPD");
+    }
 
-// Retrieve the content from the target MPD URL.
-$res = file_get_contents($mpdUrl, false, $context);
-
-// Output the MPD data.
-echo $res;
-?>
+    const text = await response.text();
+    // Set appropriate Content-Type for MPD (DASH)
+    res.setHeader("Content-Type", "application/dash+xml");
+    return res.status(200).send(text);
+  } catch (err) {
+    return res.status(500).send("Server error");
+  }
+}
